@@ -33,7 +33,7 @@ func NewClient(name string) *Client {
 
 // Start is ...
 func (c *Client) Start(ctx context.Context) error {
-	conn, err := grpc.DialContext(ctx, ":9950", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.DialContext(ctx, ":50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
