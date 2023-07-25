@@ -60,9 +60,6 @@ func NewServer(serverID string) *server {
 }
 
 func (s *server) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	srv := grpc.NewServer()
 	quiz.RegisterQuizServer(srv, s)
 
@@ -73,9 +70,9 @@ func (s *server) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := srv.Serve(listener); err != nil {
-		return err
-	}
+	go func() {
+		_ = srv.Serve(listener)
+	}()
 
 	// wait until ctx is done
 	<-ctx.Done()
