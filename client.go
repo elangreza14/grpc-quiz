@@ -1,3 +1,4 @@
+// package main
 package main
 
 import (
@@ -11,24 +12,28 @@ import (
 	quiz "github.com/elangreza14/grpc-quiz/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
-type client struct {
+// Client is ...
+type Client struct {
 	name     string
 	serverID string
 	client   quiz.QuizClient
 }
 
-func NewClient(name string) *client {
-	return &client{
+// NewClient is ...
+func NewClient(name string) *Client {
+	return &Client{
 		name: name,
 	}
 }
 
-func (c *client) Start(ctx context.Context) error {
-	conn, err := grpc.DialContext(ctx, "0.0.0.0:50051", grpc.WithInsecure())
+// Start is ...
+func (c *Client) Start(ctx context.Context) error {
+	conn, err := grpc.DialContext(ctx, ":9950", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
@@ -38,7 +43,7 @@ func (c *client) Start(ctx context.Context) error {
 	return c.login(ctx)
 }
 
-func (c *client) login(ctx context.Context) error {
+func (c *Client) login(ctx context.Context) error {
 	res, err := c.client.Register(ctx, &quiz.RegisterRequest{
 		Name:     c.name,
 		ServerId: c.serverID,
@@ -49,10 +54,10 @@ func (c *client) login(ctx context.Context) error {
 
 	fmt.Println(res)
 
-	return c.Stream(ctx)
+	return c.stream(ctx)
 }
 
-func (c *client) Stream(ctx context.Context) error {
+func (c *Client) stream(ctx context.Context) error {
 	md := metadata.New(map[string]string{"player": c.name})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
@@ -61,12 +66,12 @@ func (c *client) Stream(ctx context.Context) error {
 		return err
 	}
 
-	go c.StreamSend(streamer)
+	go c.streamSend(streamer)
 
-	return c.StreamReceive(streamer)
+	return c.streamReceive(streamer)
 }
 
-func (c *client) StreamReceive(streamer quiz.Quiz_StreamClient) error {
+func (c *Client) streamReceive(streamer quiz.Quiz_StreamClient) error {
 	for {
 		res, err := streamer.Recv()
 
@@ -90,19 +95,23 @@ func (c *client) StreamReceive(streamer quiz.Quiz_StreamClient) error {
 	}
 }
 
-func (c *client) StreamSend(streamer quiz.Quiz_StreamClient) error {
+func (c *Client) streamSend(streamer quiz.Quiz_StreamClient) {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(bufio.ScanLines)
 
 	for {
 		select {
 		case <-streamer.Context().Done():
-			return nil
+			return
 		default:
 			if scanner.Scan() {
-				streamer.Send(&quiz.StreamRequest{
-					Message: scanner.Text(),
-				})
+				message := &quiz.StreamRequest{Message: scanner.Text()}
+				if s, ok := status.FromError(streamer.Send(message)); ok {
+					if s.Code() != codes.OK {
+						fmt.Printf("got error %v", s.Code())
+						return
+					}
+				}
 			}
 		}
 	}
