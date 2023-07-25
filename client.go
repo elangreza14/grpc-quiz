@@ -91,6 +91,7 @@ func (c *Client) streamReceive(streamer quiz.Quiz_StreamClient) error {
 			fmt.Println(res.GetServerAnnouncement().Message)
 		case *quiz.StreamResponse_ServerShutdown:
 			fmt.Println("server shuting down")
+			return nil
 		}
 	}
 }

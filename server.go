@@ -82,6 +82,8 @@ func (s *Server) Start(ctx context.Context) error {
 	// wait until ctx is done
 	<-ctx.Done()
 
+	s.broadcastToShutdown()
+
 	srv.GracefulStop()
 
 	return nil
@@ -190,6 +192,17 @@ func (s *Server) broadcastToPlayer(msg string) {
 				ServerAnnouncement: &quiz.StreamResponse_Message{
 					Message: msg,
 				},
+			},
+		}
+	}
+}
+
+func (s *Server) broadcastToShutdown() {
+	for _, playerStream := range s.players {
+		playerStream <- &quiz.StreamResponse{
+			Timestamp: timestamppb.Now(),
+			Event: &quiz.StreamResponse_ServerShutdown{
+				ServerShutdown: &quiz.StreamResponse_Shutdown{},
 			},
 		}
 	}
