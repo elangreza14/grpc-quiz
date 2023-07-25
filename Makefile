@@ -2,8 +2,8 @@ server:
 	go run *.go
 	
 client:
-	@read -p  "insert your username... " NAME; \
-	go run *.go -u $$NAME
+	@read -p  "insert your playername... " NAME; \
+	go run *.go -p $$NAME
 
 lint:
 	gofumpt -l -w .

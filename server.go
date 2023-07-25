@@ -28,9 +28,9 @@ type (
 
 	// Server is default structure for creating communication
 	Server struct {
-		players       map[string]chan *quiz.StreamResponse
-		priorityQueue chan *event
-		state         playState
+		players map[string]chan *quiz.StreamResponse
+		queue   chan *event
+		state   playState
 
 		quiz.UnimplementedQuizServer
 	}
@@ -55,9 +55,9 @@ const (
 // NewServer define a grpc server
 func NewServer() *Server {
 	return &Server{
-		players:       map[string]chan *quiz.StreamResponse{},
-		priorityQueue: make(chan *event, 100),
-		state:         Waiting,
+		players: map[string]chan *quiz.StreamResponse{},
+		queue:   make(chan *event, 100),
+		state:   Waiting,
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *Server) Start(ctx context.Context) error {
 	quiz.RegisterQuizServer(srv, s)
 
 	// listen all the event
-	go s.listenerPriorityQueue(ctx)
+	go s.listenQueue(ctx)
 	go s.listenTerminal(ctx)
 
 	listener, err := net.Listen("tcp", ":50051")
@@ -94,7 +94,7 @@ func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.R
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
 	}
 
-	s.publisherPriorityQueue(&event{
+	s.publishQueue(&event{
 		eventType: InsertPlayer,
 		payload:   req.Name,
 	})
@@ -120,6 +120,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 
 	go s.streamSend(stream, streamPlayer)
 
+	// receive the stream
 	for {
 		req, err := stream.Recv()
 		if err != nil {
@@ -129,7 +130,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 			return err
 		}
 
-		s.publisherPriorityQueue(&event{
+		s.publishQueue(&event{
 			eventType: Broadcast,
 			payload:   req.Message,
 		})
@@ -155,37 +156,41 @@ func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *
 	}
 }
 
-func (s *Server) publisherPriorityQueue(evt *event) {
-	s.priorityQueue <- evt
+func (s *Server) publishQueue(evt *event) {
+	s.queue <- evt
 }
 
-func (s *Server) listenerPriorityQueue(ctx context.Context) {
+func (s *Server) listenQueue(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case evt := <-s.priorityQueue:
+		case evt := <-s.queue:
 			switch evt.eventType {
 			case InsertPlayer:
 				s.players[evt.payload.(string)] = make(chan *quiz.StreamResponse, 100)
 				fmt.Printf("player %s joined. total %d players \n", evt.payload, len(s.players))
 			case StartGame:
 				s.state = Started
-				fmt.Println("game started")
+				s.broadcastToPlayer("game started")
 			case Broadcast:
-				for _, playerStream := range s.players {
-					playerStream <- &quiz.StreamResponse{
-						Timestamp: timestamppb.Now(),
-						Event: &quiz.StreamResponse_ServerAnnouncement{
-							ServerAnnouncement: &quiz.StreamResponse_Message{
-								Message: evt.payload.(string),
-							},
-						},
-					}
-				}
+				s.broadcastToPlayer(evt.payload.(string))
 			default:
 				// no operation
 			}
+		}
+	}
+}
+
+func (s *Server) broadcastToPlayer(msg string) {
+	for _, playerStream := range s.players {
+		playerStream <- &quiz.StreamResponse{
+			Timestamp: timestamppb.Now(),
+			Event: &quiz.StreamResponse_ServerAnnouncement{
+				ServerAnnouncement: &quiz.StreamResponse_Message{
+					Message: msg,
+				},
+			},
 		}
 	}
 }
@@ -202,7 +207,7 @@ func (s *Server) listenTerminal(ctx context.Context) {
 		default:
 			if scanner.Scan() {
 				if s.state == Waiting && len(s.players) >= 2 {
-					s.publisherPriorityQueue(&event{
+					s.publishQueue(&event{
 						eventType: StartGame,
 					})
 				}

@@ -9,14 +9,13 @@ import (
 	"syscall"
 )
 
-var username string
+var playerName = flag.String("p", "", "player name is optional, if exist will create client runner.")
 
 type runner interface {
 	Start(context.Context) error
 }
 
 func main() {
-	flag.StringVar(&username, "u", "", "username for the client, if empty will run server mode.")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -31,8 +30,8 @@ func main() {
 
 	// default mode is client mode
 	var Runner runner = NewServer()
-	if username != "" {
-		Runner = NewClient(username)
+	if *playerName != "" {
+		Runner = NewClient(*playerName)
 	}
 
 	// start the runner
