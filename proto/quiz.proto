@@ -28,13 +28,8 @@ message StreamResponse {
     google.protobuf.Timestamp timestamp = 1;
 
     oneof event {
-        Register client_register = 2;
+        Shutdown server_shutdown = 2;
         Message  server_announcement  = 3;
-        Shutdown server_shutdown = 4;
-    }
-
-    message Register {
-        string name = 1;
     }
 
     message Message {
