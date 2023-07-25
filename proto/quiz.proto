@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package quiz;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package="github.com/elangreza14/grpc-quiz/quiz";
+
+service Quiz {
+    rpc Register(RegisterRequest) returns (RegisterResponse) {}
+    rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
+}
+
+message RegisterRequest {
+    string name = 1;
+    string server_id = 2;
+}
+
+message RegisterResponse {
+    string message = 1;
+}
+
+message StreamRequest {
+    string message = 2;
+}
+
+message StreamResponse {
+    google.protobuf.Timestamp timestamp = 1;
+
+    oneof event {
+        Register client_register = 2;
+        Message  server_announcement  = 3;
+        Shutdown server_shutdown = 4;
+    }
+
+    message Register {
+        string name = 1;
+    }
+
+    message Message {
+        string message = 2;
+    }
+
+    message Shutdown {}
+}
