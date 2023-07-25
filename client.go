@@ -35,11 +35,7 @@ func (c *client) Start(ctx context.Context) error {
 
 	c.client = quiz.NewQuizClient(conn)
 
-	if err = c.login(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return c.login(ctx)
 }
 
 func (c *client) login(ctx context.Context) error {
@@ -47,16 +43,13 @@ func (c *client) login(ctx context.Context) error {
 		Name:     c.name,
 		ServerId: c.serverID,
 	})
-
 	if err != nil {
 		return err
 	}
 
 	fmt.Println(res)
 
-	c.Stream(ctx)
-
-	return nil
+	return c.Stream(ctx)
 }
 
 func (c *client) Stream(ctx context.Context) error {

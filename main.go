@@ -3,23 +3,20 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"math/rand"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
-var (
-	mode string
-	name string
-)
+var username string
+
+type runner interface {
+	Start(context.Context) error
+}
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	flag.StringVar(&mode, "m", "client", "mode, can be client or server")
-	flag.StringVar(&name, "n", "", "username for the client")
+	flag.StringVar(&username, "u", "", "username for the client, if empty will run server mode.")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,20 +29,14 @@ func main() {
 		cancel()
 	}()
 
-	if mode == "server" {
-		fmt.Println("running server mode")
-		serverID := fmt.Sprintf("%d", rand.Intn(1000))
-		server := NewServer(serverID)
-		err := server.Start(ctx)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		fmt.Println("running client mode")
-		client := NewClient(name)
-		err := client.Start(ctx)
-		if err != nil {
-			panic(err)
-		}
+	// default mode is client mode
+	var Runner runner = NewServer()
+	if username != "" {
+		Runner = NewClient(username)
+	}
+
+	// start the runner
+	if err := Runner.Start(ctx); err != nil {
+		log.Fatal(err)
 	}
 }

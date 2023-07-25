@@ -26,7 +26,6 @@ type (
 	}
 
 	server struct {
-		serverID      string
 		players       map[string]chan *quiz.StreamResponse
 		priorityQueue chan *event
 		state         playState
@@ -45,9 +44,8 @@ const (
 	Finish
 )
 
-func NewServer(serverID string) *server {
+func NewServer() *server {
 	srv := &server{
-		serverID:      serverID,
 		players:       map[string]chan *quiz.StreamResponse{},
 		priorityQueue: make(chan *event, 100),
 		state:         Waiting,
@@ -70,9 +68,7 @@ func (s *server) Start(ctx context.Context) error {
 		return err
 	}
 
-	go func() {
-		_ = srv.Serve(listener)
-	}()
+	go func() { srv.Serve(listener) }()
 
 	// wait until ctx is done
 	<-ctx.Done()
@@ -82,7 +78,7 @@ func (s *server) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *server) Register(ctx context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
+func (s *server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
 	_, ok := s.players[req.Name]
 	if ok {
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
@@ -181,7 +177,7 @@ func (s *server) ListenTerminal(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			return
 		default:
 			if scanner.Scan() {
 				if s.state == Waiting && len(s.players) >= 2 {
