@@ -118,7 +118,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	go s.streamSender(stream, streamPlayer)
+	go s.streamSend(stream, streamPlayer)
 
 	for {
 		req, err := stream.Recv()
@@ -139,7 +139,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	return stream.Context().Err()
 }
 
-func (s *Server) streamSender(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
+func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
 	for {
 		select {
 		case <-stream.Context().Done():
