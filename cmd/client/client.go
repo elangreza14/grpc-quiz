@@ -1,5 +1,5 @@
-// package main
-package main
+// package client
+package client
 
 import (
 	"bufio"
@@ -40,7 +40,11 @@ func (c *Client) Start(ctx context.Context) error {
 
 	c.client = quiz.NewQuizClient(conn)
 
-	return c.login(ctx)
+	if err = c.login(ctx); err != nil {
+		return err
+	}
+
+	return c.stream(ctx)
 }
 
 func (c *Client) login(ctx context.Context) error {
@@ -54,7 +58,7 @@ func (c *Client) login(ctx context.Context) error {
 
 	fmt.Println(res)
 
-	return c.stream(ctx)
+	return nil
 }
 
 func (c *Client) stream(ctx context.Context) error {

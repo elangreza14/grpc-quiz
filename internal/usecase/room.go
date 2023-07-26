@@ -10,8 +10,9 @@ import (
 
 type (
 	eventType int
-	playState int
+	PlayState int
 
+	// Event is ...
 	Event struct {
 		EventType eventType
 		Payload   any
@@ -21,7 +22,7 @@ type (
 	Room struct {
 		players map[string]chan *quiz.StreamResponse
 		queue   chan *Event
-		State   playState
+		State   PlayState
 	}
 )
 
@@ -34,13 +35,14 @@ const (
 	StartGame
 
 	// Waiting is state when waiting all the players
-	Waiting playState = iota
+	Waiting PlayState = iota
 	// Started is state when game is started
 	Started
 	// TODO Finish is state when game is finished
 	// TODO Finish
 )
 
+// NewRoom is
 func NewRoom() *Room {
 	return &Room{
 		players: map[string]chan *quiz.StreamResponse{},
@@ -92,8 +94,8 @@ func (r *Room) BroadcastToPlayer(msg string) {
 	}
 }
 
-// BroadcastToShutdown is ...
-func (r *Room) BroadcastToShutdown() {
+// ShutdownClient is ...
+func (r *Room) ShutdownClient() {
 	for i := range r.players {
 		r.players[i] <- &quiz.StreamResponse{
 			Timestamp: timestamppb.Now(),
@@ -118,4 +120,9 @@ func (r *Room) RemovePlayer(name string) {
 // TotalPlayer is ...
 func (r Room) TotalPlayer() int {
 	return len(r.players)
+}
+
+// GetState is ...
+func (r Room) GetState() PlayState {
+	return r.State
 }

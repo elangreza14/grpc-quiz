@@ -1,13 +1,11 @@
-// package main
-package main
+// package server
+package server
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"net"
-	"os"
 
 	"github.com/elangreza14/grpc-quiz/internal/usecase"
 	quiz "github.com/elangreza14/grpc-quiz/proto"
@@ -20,7 +18,8 @@ import (
 type (
 	// Server is default structure for creating communication
 	Server struct {
-		Room *usecase.Room
+		Room     *usecase.Room
+		Terminal *usecase.Terminal
 
 		quiz.UnimplementedQuizServer
 	}
@@ -29,7 +28,8 @@ type (
 // NewServer define a grpc server
 func NewServer() *Server {
 	return &Server{
-		Room: usecase.NewRoom(),
+		Room:     usecase.NewRoom(),
+		Terminal: usecase.NewTerminal(),
 	}
 }
 
@@ -54,7 +54,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// wait until ctx is done
 	<-ctx.Done()
 
-	s.Room.BroadcastToShutdown()
+	s.Room.ShutdownClient()
 
 	srv.GracefulStop()
 
@@ -94,6 +94,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
+
 	defer func() {
 		close(streamPlayer)
 		s.Room.RemovePlayer(name[0])
@@ -135,21 +136,22 @@ func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *
 }
 
 func (s *Server) listenTerminal(ctx context.Context) {
-	fmt.Println("start the game. minimum two player (Y/N)")
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(bufio.ScanLines)
-
+	fmt.Println("Waiting players to join. minimum is 2 players to start")
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if scanner.Scan() {
-				if s.Room.State == usecase.Waiting && s.Room.TotalPlayer() >= 2 {
-					s.Room.PublishQueue(&usecase.Event{
-						EventType: usecase.StartGame,
-					})
-				}
+			decision, err := s.Terminal.ValBoolean()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			if decision && s.Room.GetState() == usecase.Waiting && s.Room.TotalPlayer() >= 2 {
+				s.Room.PublishQueue(&usecase.Event{
+					EventType: usecase.StartGame,
+				})
 			}
 		}
 	}

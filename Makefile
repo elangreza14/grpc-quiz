@@ -1,9 +1,9 @@
 server:
-	go run *.go
+	go run cmd/quiz/main.go
 	
 client:
 	@read -p  "insert your playername... " NAME; \
-	go run *.go -p $$NAME
+	go run cmd/quiz/main.go -p $$NAME
 
 lint:
 	gofumpt -l -w .

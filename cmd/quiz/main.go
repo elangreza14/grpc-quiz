@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	client "github.com/elangreza14/grpc-quiz/cmd/client"
+	server "github.com/elangreza14/grpc-quiz/cmd/server"
 )
 
 var playerName = flag.String("p", "", "player name is optional, if exist will create client runner.")
@@ -29,9 +32,9 @@ func main() {
 	}()
 
 	// default mode is client mode
-	var Runner runner = NewServer()
+	var Runner runner = server.NewServer()
 	if *playerName != "" {
-		Runner = NewClient(*playerName)
+		Runner = client.NewClient(*playerName)
 	}
 
 	// start the runner
