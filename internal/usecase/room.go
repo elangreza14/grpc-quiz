@@ -10,8 +10,9 @@ import (
 )
 
 type (
+	// State ...
+	State     int
 	eventType int
-	PlayState int
 
 	// Event is ...
 	Event struct {
@@ -24,7 +25,7 @@ type (
 		// players  map[string]chan *quiz.StreamResponse
 		players sync.Map
 		queue   chan *Event
-		State   PlayState
+		State   State
 	}
 )
 
@@ -37,7 +38,7 @@ const (
 	StartGame
 
 	// Waiting is state when waiting all the players
-	Waiting PlayState = iota
+	Waiting State = iota
 	// Started is state when game is started
 	Started
 	// TODO Finish is state when game is finished
@@ -70,8 +71,7 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				// initialize the player
 				player := evt.Payload.(string)
 				r.players.Store(player, make(chan *quiz.StreamResponse, 100))
-				// fmt.Printf("player %s joined. total %d players \n", evt.Payload, len(r.players))
-				fmt.Printf("player %s joined. total %d players \n", evt.Payload, r.TotalPlayer())
+				fmt.Printf("player %s joined. total %d players \n", player, r.TotalPlayer())
 			case StartGame:
 				r.State = Started
 				r.BroadcastToPlayer("game started")
@@ -98,6 +98,7 @@ func (r *Room) BroadcastToPlayer(msg string) {
 				},
 			}
 		}
+
 		return true
 	})
 }
@@ -114,6 +115,7 @@ func (r *Room) ShutdownClient() {
 				},
 			}
 		}
+
 		return true
 	})
 }
@@ -139,7 +141,7 @@ func (r *Room) RemovePlayer(name string) {
 // TotalPlayer is ...
 func (r *Room) TotalPlayer() int {
 	total := 0
-	r.players.Range(func(key, value any) bool {
+	r.players.Range(func(_, _ any) bool {
 		total++
 		return true
 	})
@@ -148,6 +150,6 @@ func (r *Room) TotalPlayer() int {
 }
 
 // GetState is ...
-func (r *Room) GetState() PlayState {
+func (r *Room) GetState() State {
 	return r.State
 }

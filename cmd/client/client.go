@@ -2,13 +2,12 @@
 package client
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
+	"github.com/elangreza14/grpc-quiz/internal/usecase"
 	quiz "github.com/elangreza14/grpc-quiz/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -19,14 +18,16 @@ import (
 
 // Client is ...
 type Client struct {
-	name   string
-	client quiz.QuizClient
+	name     string
+	client   quiz.QuizClient
+	Terminal *usecase.Terminal
 }
 
 // NewClient is ...
 func NewClient(name string) *Client {
 	return &Client{
-		name: name,
+		name:     name,
+		Terminal: usecase.NewTerminal(),
 	}
 }
 
@@ -99,16 +100,14 @@ func (c *Client) streamReceive(streamer quiz.Quiz_StreamClient) error {
 }
 
 func (c *Client) streamSend(streamer quiz.Quiz_StreamClient) {
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(bufio.ScanLines)
-
 	for {
 		select {
 		case <-streamer.Context().Done():
 			return
 		default:
-			if scanner.Scan() {
-				message := &quiz.StreamRequest{Message: scanner.Text()}
+			val, ok := c.Terminal.ValText()
+			if ok {
+				message := &quiz.StreamRequest{Message: val}
 				if s, ok := status.FromError(streamer.Send(message)); ok {
 					if s.Code() != codes.OK {
 						fmt.Printf("got error %v", s.Code())
