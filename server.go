@@ -9,57 +9,27 @@ import (
 	"net"
 	"os"
 
+	"github.com/elangreza14/grpc-quiz/internal/usecase"
 	quiz "github.com/elangreza14/grpc-quiz/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type (
-	eventType int
-	playState int
-
-	event struct {
-		eventType eventType
-		payload   any
-	}
-
-	player string
-
 	// Server is default structure for creating communication
 	Server struct {
-		players map[player]chan *quiz.StreamResponse
-		queue   chan *event
-		state   playState
+		Room *usecase.Room
 
 		quiz.UnimplementedQuizServer
 	}
 )
 
-const (
-	//  InsertPlayer is event for inserting players to players
-	InsertPlayer eventType = iota
-	//  Broadcast is event for broadcast all the player
-	Broadcast
-	//  StartGame is event for start the game
-	StartGame
-
-	// Waiting is state when waiting all the players
-	Waiting playState = iota
-	// Started is state when game is started
-	Started
-	// TODO Finish is state when game is finished
-	// TODO Finish
-)
-
 // NewServer define a grpc server
 func NewServer() *Server {
 	return &Server{
-		players: map[player]chan *quiz.StreamResponse{},
-		queue:   make(chan *event, 100),
-		state:   Waiting,
+		Room: usecase.NewRoom(),
 	}
 }
 
@@ -69,7 +39,7 @@ func (s *Server) Start(ctx context.Context) error {
 	quiz.RegisterQuizServer(srv, s)
 
 	// listen all the event
-	go s.listenQueue(ctx)
+	go s.Room.ListenQueue(ctx)
 	go s.listenTerminal(ctx)
 
 	listener, err := net.Listen("tcp", ":50051")
@@ -84,7 +54,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// wait until ctx is done
 	<-ctx.Done()
 
-	s.broadcastToShutdown()
+	s.Room.BroadcastToShutdown()
 
 	srv.GracefulStop()
 
@@ -93,14 +63,14 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Register is handler for register player
 func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
-	_, ok := s.getPlayerDetail(player(req.Name))
+	_, ok := s.Room.GetPlayerDetail(req.Name)
 	if ok {
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
 	}
 
-	s.publishQueue(&event{
-		eventType: InsertPlayer,
-		payload:   req.Name,
+	s.Room.PublishQueue(&usecase.Event{
+		EventType: usecase.InsertPlayer,
+		Payload:   req.Name,
 	})
 
 	return &quiz.RegisterResponse{
@@ -120,13 +90,13 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	streamPlayer, ok := s.getPlayerDetail(player(name[0]))
+	streamPlayer, ok := s.Room.GetPlayerDetail(name[0])
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 	defer func() {
 		close(streamPlayer)
-		delete(s.players, player(name[0]))
+		s.Room.RemovePlayer(name[0])
 	}()
 
 	go s.streamSend(stream, streamPlayer)
@@ -141,9 +111,9 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 			return err
 		}
 
-		s.publishQueue(&event{
-			eventType: Broadcast,
-			payload:   req.Message,
+		s.Room.PublishQueue(&usecase.Event{
+			EventType: usecase.Broadcast,
+			Payload:   req.Message,
 		})
 	}
 }
@@ -164,62 +134,6 @@ func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *
 	}
 }
 
-func (s *Server) publishQueue(evt *event) {
-	s.queue <- evt
-}
-
-func (s *Server) listenQueue(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case evt := <-s.queue:
-			switch evt.eventType {
-			case InsertPlayer:
-				// initialize the player
-				s.players[player(evt.payload.(string))] = make(chan *quiz.StreamResponse, 100)
-				fmt.Printf("player %s joined. total %d players \n", evt.payload, len(s.players))
-			case StartGame:
-				s.state = Started
-				s.broadcastToPlayer("game started")
-			case Broadcast:
-				s.broadcastToPlayer(evt.payload.(string))
-			default:
-				// no operation
-			}
-		}
-	}
-}
-
-func (s *Server) broadcastToPlayer(msg string) {
-	for i := range s.players {
-		s.players[i] <- &quiz.StreamResponse{
-			Timestamp: timestamppb.Now(),
-			Event: &quiz.StreamResponse_ServerAnnouncement{
-				ServerAnnouncement: &quiz.StreamResponse_Message{
-					Message: msg,
-				},
-			},
-		}
-	}
-}
-
-func (s *Server) broadcastToShutdown() {
-	for i := range s.players {
-		s.players[i] <- &quiz.StreamResponse{
-			Timestamp: timestamppb.Now(),
-			Event: &quiz.StreamResponse_ServerShutdown{
-				ServerShutdown: &quiz.StreamResponse_Shutdown{},
-			},
-		}
-	}
-}
-
-func (s *Server) getPlayerDetail(player player) (chan *quiz.StreamResponse, bool) {
-	res, ok := s.players[player]
-	return res, ok
-}
-
 func (s *Server) listenTerminal(ctx context.Context) {
 	fmt.Println("start the game. minimum two player (Y/N)")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -231,9 +145,9 @@ func (s *Server) listenTerminal(ctx context.Context) {
 			return
 		default:
 			if scanner.Scan() {
-				if s.state == Waiting && len(s.players) >= 2 {
-					s.publishQueue(&event{
-						eventType: StartGame,
+				if s.Room.State == usecase.Waiting && s.Room.TotalPlayer() >= 2 {
+					s.Room.PublishQueue(&usecase.Event{
+						EventType: usecase.StartGame,
 					})
 				}
 			}
