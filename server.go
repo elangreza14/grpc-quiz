@@ -127,7 +127,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
-				break
+				return nil
 			}
 			return err
 		}
@@ -138,8 +138,8 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		})
 	}
 
-	<-stream.Context().Done()
-	return stream.Context().Err()
+	// <-stream.Context().Done()
+	// return stream.Context().Err()
 }
 
 func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
@@ -185,8 +185,8 @@ func (s *Server) listenQueue(ctx context.Context) {
 }
 
 func (s *Server) broadcastToPlayer(msg string) {
-	for _, playerStream := range s.players {
-		playerStream <- &quiz.StreamResponse{
+	for i := range s.players {
+		s.players[i] <- &quiz.StreamResponse{
 			Timestamp: timestamppb.Now(),
 			Event: &quiz.StreamResponse_ServerAnnouncement{
 				ServerAnnouncement: &quiz.StreamResponse_Message{
@@ -198,8 +198,8 @@ func (s *Server) broadcastToPlayer(msg string) {
 }
 
 func (s *Server) broadcastToShutdown() {
-	for _, playerStream := range s.players {
-		playerStream <- &quiz.StreamResponse{
+	for i := range s.players {
+		s.players[i] <- &quiz.StreamResponse{
 			Timestamp: timestamppb.Now(),
 			Event: &quiz.StreamResponse_ServerShutdown{
 				ServerShutdown: &quiz.StreamResponse_Shutdown{},
