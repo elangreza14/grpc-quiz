@@ -26,9 +26,11 @@ type (
 		payload   any
 	}
 
+	player string
+
 	// Server is default structure for creating communication
 	Server struct {
-		players map[string]chan *quiz.StreamResponse
+		players map[player]chan *quiz.StreamResponse
 		queue   chan *event
 		state   playState
 
@@ -55,7 +57,7 @@ const (
 // NewServer define a grpc server
 func NewServer() *Server {
 	return &Server{
-		players: map[string]chan *quiz.StreamResponse{},
+		players: map[player]chan *quiz.StreamResponse{},
 		queue:   make(chan *event, 100),
 		state:   Waiting,
 	}
@@ -91,7 +93,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Register is handler for register player
 func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
-	_, ok := s.players[req.Name]
+	_, ok := s.players[player(req.Name)]
 	if ok {
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
 	}
@@ -118,13 +120,13 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	streamPlayer, ok := s.players[name[0]]
+	streamPlayer, ok := s.players[player(name[0])]
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 	defer func() {
 		close(streamPlayer)
-		delete(s.players, name[0])
+		delete(s.players, player(name[0]))
 	}()
 
 	go s.streamSend(stream, streamPlayer)
@@ -174,7 +176,7 @@ func (s *Server) listenQueue(ctx context.Context) {
 		case evt := <-s.queue:
 			switch evt.eventType {
 			case InsertPlayer:
-				s.players[evt.payload.(string)] = make(chan *quiz.StreamResponse, 100)
+				s.players[player(evt.payload.(string))] = make(chan *quiz.StreamResponse, 100)
 				fmt.Printf("player %s joined. total %d players \n", evt.payload, len(s.players))
 			case StartGame:
 				s.state = Started
