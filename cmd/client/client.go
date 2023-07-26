@@ -39,14 +39,14 @@ func (c *Client) Start(ctx context.Context) error {
 
 	c.client = quiz.NewQuizClient(conn)
 
-	if err = c.login(ctx); err != nil {
+	if err = c.register(ctx); err != nil {
 		return err
 	}
 
 	return c.stream(ctx)
 }
 
-func (c *Client) login(ctx context.Context) error {
+func (c *Client) register(ctx context.Context) error {
 	res, err := c.client.Register(ctx, &quiz.RegisterRequest{
 		Name: c.name,
 	})
