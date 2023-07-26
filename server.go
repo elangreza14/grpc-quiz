@@ -93,7 +93,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Register is handler for register player
 func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
-	_, ok := s.players[player(req.Name)]
+	_, ok := s.getPlayerDetail(player(req.Name))
 	if ok {
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
 	}
@@ -116,11 +116,11 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	}
 
 	name := md.Get("player")
-	if len(name[0]) == 0 {
+	if len(name) == 0 {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	streamPlayer, ok := s.players[player(name[0])]
+	streamPlayer, ok := s.getPlayerDetail(player(name[0]))
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
@@ -176,6 +176,7 @@ func (s *Server) listenQueue(ctx context.Context) {
 		case evt := <-s.queue:
 			switch evt.eventType {
 			case InsertPlayer:
+				// initialize the player
 				s.players[player(evt.payload.(string))] = make(chan *quiz.StreamResponse, 100)
 				fmt.Printf("player %s joined. total %d players \n", evt.payload, len(s.players))
 			case StartGame:
@@ -212,6 +213,11 @@ func (s *Server) broadcastToShutdown() {
 			},
 		}
 	}
+}
+
+func (s *Server) getPlayerDetail(player player) (chan *quiz.StreamResponse, bool) {
+	res, ok := s.players[player]
+	return res, ok
 }
 
 func (s *Server) listenTerminal(ctx context.Context) {
