@@ -1,4 +1,4 @@
-// package server
+// Package server ....
 package server
 
 import (
@@ -98,6 +98,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	defer func() {
 		close(streamPlayer)
 		s.Room.RemovePlayer(name[0])
+		fmt.Printf("player %s left. total %d players \n", name[0], s.Room.TotalPlayer())
 	}()
 
 	go s.streamSend(stream, streamPlayer)

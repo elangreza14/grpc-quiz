@@ -1,4 +1,4 @@
-// package client
+// Package client ....
 package client
 
 import (
@@ -19,9 +19,8 @@ import (
 
 // Client is ...
 type Client struct {
-	name     string
-	serverID string
-	client   quiz.QuizClient
+	name   string
+	client quiz.QuizClient
 }
 
 // NewClient is ...
@@ -49,8 +48,7 @@ func (c *Client) Start(ctx context.Context) error {
 
 func (c *Client) login(ctx context.Context) error {
 	res, err := c.client.Register(ctx, &quiz.RegisterRequest{
-		Name:     c.name,
-		ServerId: c.serverID,
+		Name: c.name,
 	})
 	if err != nil {
 		return err

@@ -13,7 +13,6 @@ service Quiz {
 
 message RegisterRequest {
     string name = 1;
-    string server_id = 2;
 }
 
 message RegisterResponse {
@@ -21,7 +20,7 @@ message RegisterResponse {
 }
 
 message StreamRequest {
-    string message = 2;
+    string message = 1;
 }
 
 message StreamResponse {

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	quiz "github.com/elangreza14/grpc-quiz/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,7 +21,8 @@ type (
 
 	// Room is default structure for creating communication
 	Room struct {
-		players map[string]chan *quiz.StreamResponse
+		// players  map[string]chan *quiz.StreamResponse
+		players sync.Map
 		queue   chan *Event
 		State   PlayState
 	}
@@ -45,7 +47,7 @@ const (
 // NewRoom is
 func NewRoom() *Room {
 	return &Room{
-		players: map[string]chan *quiz.StreamResponse{},
+		players: sync.Map{},
 		queue:   make(chan *Event, 100),
 		State:   Waiting,
 	}
@@ -66,8 +68,10 @@ func (r *Room) ListenQueue(ctx context.Context) {
 			switch evt.EventType {
 			case InsertPlayer:
 				// initialize the player
-				r.players[evt.Payload.(string)] = make(chan *quiz.StreamResponse, 100)
-				fmt.Printf("player %s joined. total %d players \n", evt.Payload, len(r.players))
+				player := evt.Payload.(string)
+				r.players.Store(player, make(chan *quiz.StreamResponse, 100))
+				// fmt.Printf("player %s joined. total %d players \n", evt.Payload, len(r.players))
+				fmt.Printf("player %s joined. total %d players \n", evt.Payload, r.TotalPlayer())
 			case StartGame:
 				r.State = Started
 				r.BroadcastToPlayer("game started")
@@ -82,47 +86,68 @@ func (r *Room) ListenQueue(ctx context.Context) {
 
 // BroadcastToPlayer is ...
 func (r *Room) BroadcastToPlayer(msg string) {
-	for i := range r.players {
-		r.players[i] <- &quiz.StreamResponse{
-			Timestamp: timestamppb.Now(),
-			Event: &quiz.StreamResponse_ServerAnnouncement{
-				ServerAnnouncement: &quiz.StreamResponse_Message{
-					Message: msg,
+	r.players.Range(func(key, value any) bool {
+		ch, okChan := value.(chan *quiz.StreamResponse)
+		if okChan {
+			ch <- &quiz.StreamResponse{
+				Timestamp: timestamppb.Now(),
+				Event: &quiz.StreamResponse_ServerAnnouncement{
+					ServerAnnouncement: &quiz.StreamResponse_Message{
+						Message: msg,
+					},
 				},
-			},
+			}
 		}
-	}
+		return true
+	})
 }
 
 // ShutdownClient is ...
 func (r *Room) ShutdownClient() {
-	for i := range r.players {
-		r.players[i] <- &quiz.StreamResponse{
-			Timestamp: timestamppb.Now(),
-			Event: &quiz.StreamResponse_ServerShutdown{
-				ServerShutdown: &quiz.StreamResponse_Shutdown{},
-			},
+	r.players.Range(func(key, value any) bool {
+		ch, okChan := value.(chan *quiz.StreamResponse)
+		if okChan {
+			ch <- &quiz.StreamResponse{
+				Timestamp: timestamppb.Now(),
+				Event: &quiz.StreamResponse_ServerShutdown{
+					ServerShutdown: &quiz.StreamResponse_Shutdown{},
+				},
+			}
 		}
-	}
+		return true
+	})
 }
 
 // GetPlayerDetail is ...
 func (r *Room) GetPlayerDetail(player string) (chan *quiz.StreamResponse, bool) {
-	res, ok := r.players[player]
-	return res, ok
+	res, ok := r.players.Load(player)
+	if ok {
+		ch, okChan := res.(chan *quiz.StreamResponse)
+		if okChan {
+			return ch, true
+		}
+	}
+
+	return nil, false
 }
 
 // RemovePlayer is ...
 func (r *Room) RemovePlayer(name string) {
-	delete(r.players, name)
+	r.players.Delete(name)
 }
 
 // TotalPlayer is ...
-func (r Room) TotalPlayer() int {
-	return len(r.players)
+func (r *Room) TotalPlayer() int {
+	total := 0
+	r.players.Range(func(key, value any) bool {
+		total++
+		return true
+	})
+
+	return total
 }
 
 // GetState is ...
-func (r Room) GetState() PlayState {
+func (r *Room) GetState() PlayState {
 	return r.State
 }
