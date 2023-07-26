@@ -114,11 +114,18 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	}
 
 	name := md.Get("player")
+	if len(name[0]) == 0 {
+		return status.Errorf(codes.Unauthenticated, "player not found")
+	}
 
 	streamPlayer, ok := s.players[name[0]]
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
+	defer func() {
+		close(streamPlayer)
+		delete(s.players, name[0])
+	}()
 
 	go s.streamSend(stream, streamPlayer)
 
@@ -137,9 +144,6 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 			payload:   req.Message,
 		})
 	}
-
-	// <-stream.Context().Done()
-	// return stream.Context().Err()
 }
 
 func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
