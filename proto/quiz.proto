@@ -7,21 +7,19 @@ import "google/protobuf/timestamp.proto";
 option go_package="github.com/elangreza14/grpc-quiz/quiz";
 
 service Quiz {
-    rpc Register(RegisterRequest) returns (RegisterResponse) {}
-    rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
+    rpc Register(RegisterRequest) returns (Message) {}
+    rpc Stream(stream Message) returns (stream StreamResponse) {}
 }
 
 message RegisterRequest {
-    string name = 1;
+    string player = 1;
 }
 
-message RegisterResponse {
+message Message {
     string message = 1;
 }
 
-message StreamRequest {
-    string message = 1;
-}
+message Shutdown {}
 
 message StreamResponse {
     google.protobuf.Timestamp timestamp = 1;
@@ -30,10 +28,4 @@ message StreamResponse {
         Shutdown server_shutdown = 2;
         Message  server_announcement  = 3;
     }
-
-    message Message {
-        string message = 2;
-    }
-
-    message Shutdown {}
 }

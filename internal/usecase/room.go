@@ -92,7 +92,7 @@ func (r *Room) BroadcastToPlayer(msg string) {
 			ch <- &quiz.StreamResponse{
 				Timestamp: timestamppb.Now(),
 				Event: &quiz.StreamResponse_ServerAnnouncement{
-					ServerAnnouncement: &quiz.StreamResponse_Message{
+					ServerAnnouncement: &quiz.Message{
 						Message: msg,
 					},
 				},
@@ -111,7 +111,7 @@ func (r *Room) ShutdownClient() {
 			ch <- &quiz.StreamResponse{
 				Timestamp: timestamppb.Now(),
 				Event: &quiz.StreamResponse_ServerShutdown{
-					ServerShutdown: &quiz.StreamResponse_Shutdown{},
+					ServerShutdown: &quiz.Shutdown{},
 				},
 			}
 		}

@@ -49,7 +49,7 @@ func (c *Client) Start(ctx context.Context) error {
 
 func (c *Client) register(ctx context.Context) error {
 	res, err := c.client.Register(ctx, &quiz.RegisterRequest{
-		Name: c.name,
+		Player: c.name,
 	})
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func (c *Client) streamSend(streamer quiz.Quiz_StreamClient) {
 		default:
 			val, ok := c.Terminal.ValText()
 			if ok {
-				message := &quiz.StreamRequest{Message: val}
+				message := &quiz.Message{Message: val}
 				if s, ok := status.FromError(streamer.Send(message)); ok {
 					if s.Code() != codes.OK {
 						fmt.Printf("got error %v", s.Code())

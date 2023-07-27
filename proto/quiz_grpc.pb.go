@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type QuizClient interface {
-	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
+	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*Message, error)
 	Stream(ctx context.Context, opts ...grpc.CallOption) (Quiz_StreamClient, error)
 }
 
@@ -34,8 +34,8 @@ func NewQuizClient(cc grpc.ClientConnInterface) QuizClient {
 	return &quizClient{cc}
 }
 
-func (c *quizClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error) {
-	out := new(RegisterResponse)
+func (c *quizClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*Message, error) {
+	out := new(Message)
 	err := c.cc.Invoke(ctx, "/quiz.Quiz/Register", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *quizClient) Stream(ctx context.Context, opts ...grpc.CallOption) (Quiz_
 }
 
 type Quiz_StreamClient interface {
-	Send(*StreamRequest) error
+	Send(*Message) error
 	Recv() (*StreamResponse, error)
 	grpc.ClientStream
 }
@@ -62,7 +62,7 @@ type quizStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *quizStreamClient) Send(m *StreamRequest) error {
+func (x *quizStreamClient) Send(m *Message) error {
 	return x.ClientStream.SendMsg(m)
 }
 
@@ -78,7 +78,7 @@ func (x *quizStreamClient) Recv() (*StreamResponse, error) {
 // All implementations must embed UnimplementedQuizServer
 // for forward compatibility
 type QuizServer interface {
-	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
+	Register(context.Context, *RegisterRequest) (*Message, error)
 	Stream(Quiz_StreamServer) error
 	mustEmbedUnimplementedQuizServer()
 }
@@ -87,7 +87,7 @@ type QuizServer interface {
 type UnimplementedQuizServer struct {
 }
 
-func (UnimplementedQuizServer) Register(context.Context, *RegisterRequest) (*RegisterResponse, error) {
+func (UnimplementedQuizServer) Register(context.Context, *RegisterRequest) (*Message, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
 }
 func (UnimplementedQuizServer) Stream(Quiz_StreamServer) error {
@@ -130,7 +130,7 @@ func _Quiz_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
 
 type Quiz_StreamServer interface {
 	Send(*StreamResponse) error
-	Recv() (*StreamRequest, error)
+	Recv() (*Message, error)
 	grpc.ServerStream
 }
 
@@ -142,8 +142,8 @@ func (x *quizStreamServer) Send(m *StreamResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *quizStreamServer) Recv() (*StreamRequest, error) {
-	m := new(StreamRequest)
+func (x *quizStreamServer) Recv() (*Message, error) {
+	m := new(Message)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

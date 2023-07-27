@@ -62,19 +62,19 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Register is handler for register player
-func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.RegisterResponse, error) {
-	_, ok := s.Room.GetPlayerDetail(req.Name)
+func (s *Server) Register(_ context.Context, req *quiz.RegisterRequest) (*quiz.Message, error) {
+	_, ok := s.Room.GetPlayerDetail(req.Player)
 	if ok {
 		return nil, status.Errorf(codes.AlreadyExists, "player already exist")
 	}
 
 	s.Room.PublishQueue(&usecase.Event{
 		EventType: usecase.InsertPlayer,
-		Payload:   req.Name,
+		Payload:   req.Player,
 	})
 
-	return &quiz.RegisterResponse{
-		Message: fmt.Sprintf("hi %v, welcome to the game", req.Name),
+	return &quiz.Message{
+		Message: fmt.Sprintf("hi %v, welcome to the game", req.Player),
 	}, nil
 }
 
