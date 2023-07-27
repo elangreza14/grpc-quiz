@@ -18,15 +18,15 @@ import (
 
 // Client is ...
 type Client struct {
-	name     string
+	player   string
 	client   quiz.QuizClient
 	Terminal *usecase.Terminal
 }
 
 // NewClient is ...
-func NewClient(name string) *Client {
+func NewClient(player string) *Client {
 	return &Client{
-		name:     name,
+		player:   player,
 		Terminal: usecase.NewTerminal(),
 	}
 }
@@ -49,7 +49,7 @@ func (c *Client) Start(ctx context.Context) error {
 
 func (c *Client) register(ctx context.Context) error {
 	res, err := c.client.Register(ctx, &quiz.RegisterRequest{
-		Player: c.name,
+		Player: c.player,
 	})
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (c *Client) register(ctx context.Context) error {
 }
 
 func (c *Client) stream(ctx context.Context) error {
-	md := metadata.New(map[string]string{"player": c.name})
+	md := metadata.New(map[string]string{"player": c.player})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	streamer, err := c.client.Stream(ctx)
@@ -69,8 +69,10 @@ func (c *Client) stream(ctx context.Context) error {
 		return err
 	}
 
+	// send stream from client
 	go c.streamSend(streamer)
 
+	// receive stream from server
 	return c.streamReceive(streamer)
 }
 

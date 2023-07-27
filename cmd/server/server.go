@@ -85,39 +85,27 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	name := md.Get("player")
-	if len(name) == 0 {
+	player := md.Get("player")
+	if len(player) == 0 {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
-	streamPlayer, ok := s.Room.GetPlayerDetail(name[0])
+	streamPlayer, ok := s.Room.GetPlayerDetail(player[0])
 	if !ok {
 		return status.Errorf(codes.Unauthenticated, "player not found")
 	}
 
 	defer func() {
 		close(streamPlayer)
-		s.Room.RemovePlayer(name[0])
-		fmt.Printf("player %s left. total %d players \n", name[0], s.Room.TotalPlayer())
+		s.Room.RemovePlayer(player[0])
+		fmt.Printf("player %s left. total %d players \n", player[0], s.Room.TotalPlayer())
 	}()
 
+	// send stream from server
 	go s.streamSend(stream, streamPlayer)
 
-	// receive the stream
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-
-		s.Room.PublishQueue(&usecase.Event{
-			EventType: usecase.Broadcast,
-			Payload:   req.Message,
-		})
-	}
+	// receive stream from client
+	return s.streamReceive(stream)
 }
 
 func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
@@ -133,6 +121,23 @@ func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *
 				}
 			}
 		}
+	}
+}
+
+func (s *Server) streamReceive(stream quiz.Quiz_StreamServer) error {
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		s.Room.PublishQueue(&usecase.Event{
+			EventType: usecase.Broadcast,
+			Payload:   req.Message,
+		})
 	}
 }
 

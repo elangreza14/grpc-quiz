@@ -12,7 +12,7 @@ import (
 	server "github.com/elangreza14/grpc-quiz/cmd/server"
 )
 
-var playerName = flag.String("p", "", "player name is optional, if exist will create client runner.")
+var player = flag.String("p", "", "player name is optional, if exist will create client runner.")
 
 type runner interface {
 	Start(context.Context) error
@@ -33,8 +33,8 @@ func main() {
 
 	// default mode is client mode
 	var Runner runner = server.NewServer()
-	if *playerName != "" {
-		Runner = client.NewClient(*playerName)
+	if *player != "" {
+		Runner = client.NewClient(*player)
 	}
 
 	// start the runner

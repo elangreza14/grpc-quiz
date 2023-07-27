@@ -2,8 +2,8 @@ server:
 	go run cmd/quiz/main.go
 	
 client:
-	@read -p  "insert your playername... " NAME; \
-	go run cmd/quiz/main.go -p $$NAME
+	@read -p  "insert your name... " PLAYER; \
+	go run cmd/quiz/main.go -p $$PLAYER
 
 lint:
 	gofumpt -l -w .
