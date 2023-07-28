@@ -17,12 +17,17 @@ type (
 		payload any
 	}
 
+	GameState struct {
+		State
+		payload any
+	}
+
 	// GamePlay is ...
 	GamePlay struct {
 		players        map[string]int
 		state          State
 		internalStream chan *internalAction
-		externalStream chan string
+		externalStream chan *GameState
 		questionStream chan *QuestionPayload
 		questions      map[string]bool
 		timePerRound   time.Duration
@@ -68,7 +73,7 @@ func NewGamePlay() *GamePlay {
 		players:        map[string]int{},
 		state:          Waiting,
 		internalStream: make(chan *internalAction),
-		externalStream: make(chan string),
+		externalStream: make(chan *GameState),
 		questionStream: make(chan *QuestionPayload, len(Questions)),
 		questions:      Questions,
 		timePerRound:   3 * time.Second,
@@ -91,21 +96,28 @@ func (g *GamePlay) listenInternalStream() {
 	for res := range g.internalStream {
 		switch res.action {
 		case start:
-			g.externalStream <- "game started"
+			g.externalStream <- &GameState{
+				State: OnProgress,
+			}
 			g.state = OnProgress
 			for question, answer := range g.questions {
 				g.questionStream <- &QuestionPayload{question, answer}
 			}
 		case setQuestion:
 			g.expected = res.payload.(QuestionPayload)
-			g.externalStream <- g.expected.question
+			g.externalStream <- &GameState{
+				State:   OnProgress,
+				payload: g.expected.question,
+			}
 		case answerQuestion:
 			payload := res.payload.(SubmitAnswerPayload)
 			if payload.answer == g.expected.answer {
 				g.players[payload.name]++
 			}
 		case finish:
-			g.externalStream <- "game finished"
+			g.externalStream <- &GameState{
+				State: Done,
+			}
 			g.state = Done
 		}
 	}
@@ -146,7 +158,7 @@ func (g *GamePlay) SubmitAnswer(name string, answer bool) {
 func (g *GamePlay) AddPlayer(name string) { g.players[name] = 0 }
 
 // ListenStream ...
-func (g *GamePlay) ListenStream() <-chan string { return g.externalStream }
+func (g *GamePlay) ListenStream() <-chan *GameState { return g.externalStream }
 
 // GetStats ...
 func (g *GamePlay) GetStats() string {

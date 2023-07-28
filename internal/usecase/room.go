@@ -10,8 +10,6 @@ import (
 )
 
 type (
-	// State ...
-	// State     int
 	eventType int
 
 	// Event is ...
@@ -37,13 +35,6 @@ const (
 	Broadcast
 	//  StartGame is event for start the game
 	StartGame
-
-	// // Waiting is state when waiting all the players
-	// Waiting State = iota
-	// // Started is state when game is started
-	// Started
-	// // TODO Finish is state when game is finished
-	// // TODO Finish
 )
 
 // NewRoom is
@@ -62,13 +53,24 @@ func (r *Room) PublishQueue(evt *Event) {
 
 // ListenQueue is ...
 func (r *Room) ListenQueue(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case gameRes := <-r.Game.ListenStream():
-			fmt.Printf("game: %v\n", gameRes)
+			switch gameRes.State {
+			case OnProgress:
+				if gameRes.payload != nil {
+					fmt.Println(gameRes.payload)
+				}
+			case Done:
+				fmt.Println("game finished")
+				r.ShutdownClient()
+			default:
+			}
 		case evt := <-r.queue:
 			switch evt.EventType {
 			case InsertPlayer:
