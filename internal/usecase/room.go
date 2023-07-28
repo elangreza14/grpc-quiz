@@ -11,7 +11,7 @@ import (
 
 type (
 	// State ...
-	State     int
+	// State     int
 	eventType int
 
 	// Event is ...
@@ -25,7 +25,8 @@ type (
 		// players  map[string]chan *quiz.StreamResponse
 		players sync.Map
 		queue   chan *Event
-		State   State
+		// State   State
+		Game *GamePlay
 	}
 )
 
@@ -37,12 +38,12 @@ const (
 	//  StartGame is event for start the game
 	StartGame
 
-	// Waiting is state when waiting all the players
-	Waiting State = iota
-	// Started is state when game is started
-	Started
-	// TODO Finish is state when game is finished
-	// TODO Finish
+	// // Waiting is state when waiting all the players
+	// Waiting State = iota
+	// // Started is state when game is started
+	// Started
+	// // TODO Finish is state when game is finished
+	// // TODO Finish
 )
 
 // NewRoom is
@@ -50,7 +51,7 @@ func NewRoom() *Room {
 	return &Room{
 		players: sync.Map{},
 		queue:   make(chan *Event, 100),
-		State:   Waiting,
+		Game:    NewGamePlay(),
 	}
 }
 
@@ -61,20 +62,25 @@ func (r *Room) PublishQueue(evt *Event) {
 
 // ListenQueue is ...
 func (r *Room) ListenQueue(ctx context.Context) {
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case gameRes := <-r.Game.ListenStream():
+			fmt.Printf("game: %v\n", gameRes)
 		case evt := <-r.queue:
 			switch evt.EventType {
 			case InsertPlayer:
 				// initialize the player
 				player := evt.Payload.(string)
 				r.players.Store(player, make(chan *quiz.StreamResponse, 100))
+				r.Game.AddPlayer(player)
 				fmt.Printf("player %s joined. total %d players \n", player, r.TotalPlayer())
 			case StartGame:
-				r.State = Started
+				// r.State = Started
 				r.BroadcastToPlayer("game started")
+				r.Game.Start()
 			case Broadcast:
 				r.BroadcastToPlayer(evt.Payload.(string))
 			default:
@@ -150,6 +156,6 @@ func (r *Room) TotalPlayer() int {
 }
 
 // GetState is ...
-func (r *Room) GetState() State {
-	return r.State
-}
+// func (r *Room) GetState() State {
+// 	return r.State
+// }

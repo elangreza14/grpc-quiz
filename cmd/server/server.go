@@ -154,7 +154,7 @@ func (s *Server) listenTerminal(ctx context.Context) {
 				continue
 			}
 
-			if decision && s.Room.GetState() == usecase.Waiting && s.Room.TotalPlayer() >= 2 {
+			if decision && s.Room.TotalPlayer() >= 2 {
 				s.Room.PublishQueue(&usecase.Event{
 					EventType: usecase.StartGame,
 				})
