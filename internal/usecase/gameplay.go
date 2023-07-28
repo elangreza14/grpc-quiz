@@ -9,17 +9,19 @@ type (
 	// State ...
 	State int
 
-	// GameState ...
-	GameState struct {
-		State   State
-		Payload any
+	// action ...
+	action int
+
+	internalAction struct {
+		action
+		payload any
 	}
 
 	// GamePlay is ...
 	GamePlay struct {
 		players        map[string]int
 		state          State
-		internalStream chan *GameState
+		internalStream chan *internalAction
 		externalStream chan string
 		questionStream chan *QuestionPayload
 		questions      map[string]bool
@@ -41,16 +43,17 @@ type (
 )
 
 const (
-	// Wait is state when waiting all the players
-	Wait State = iota
-	// Start is state when game is started
-	Start
-	// SetQuestion is state when game is started
-	SetQuestion
-	//  AnswerQuestion is state when game is finished
-	AnswerQuestion
-	//  Finish is state when game is finished
-	Finish
+	start action = iota
+	setQuestion
+	answerQuestion
+	finish
+
+	// Waiting is
+	Waiting State = iota
+	// OnProgress is
+	OnProgress
+	// Done is
+	Done
 )
 
 // NewGamePlay is ...
@@ -63,8 +66,8 @@ func NewGamePlay() *GamePlay {
 
 	g := &GamePlay{
 		players:        map[string]int{},
-		state:          Wait,
-		internalStream: make(chan *GameState),
+		state:          Waiting,
+		internalStream: make(chan *internalAction),
 		externalStream: make(chan string),
 		questionStream: make(chan *QuestionPayload, len(Questions)),
 		questions:      Questions,
@@ -77,60 +80,57 @@ func NewGamePlay() *GamePlay {
 	return g
 }
 
+func (g *GamePlay) setAction(action action, payload any) {
+	g.internalStream <- &internalAction{
+		action:  action,
+		payload: payload,
+	}
+}
+
 func (g *GamePlay) listenInternalStream() {
 	for res := range g.internalStream {
-		switch res.State {
-		case Start:
+		switch res.action {
+		case start:
 			g.externalStream <- "game started"
-			g.state = Start
+			g.state = OnProgress
 			for question, answer := range g.questions {
-				g.questionStream <- &QuestionPayload{
-					question: question,
-					answer:   answer,
-				}
+				g.questionStream <- &QuestionPayload{question, answer}
 			}
-		case SetQuestion:
-			g.expected = res.Payload.(QuestionPayload)
+		case setQuestion:
+			g.expected = res.payload.(QuestionPayload)
 			g.externalStream <- g.expected.question
-		case AnswerQuestion:
-			payload := res.Payload.(SubmitAnswerPayload)
+		case answerQuestion:
+			payload := res.payload.(SubmitAnswerPayload)
 			if payload.answer == g.expected.answer {
 				g.players[payload.name]++
 			}
-		case Finish:
+		case finish:
 			g.externalStream <- "game finished"
-			g.state = Finish
+			g.state = Done
 		}
 	}
 }
 
 // Start ...
 func (g *GamePlay) Start() {
-	g.internalStream <- &GameState{
-		State: Start,
-	}
+	g.setAction(start, nil)
 }
 
 func (g *GamePlay) listenQuestion() {
 	for i := 0; i < len(g.questions); i++ {
-		v := <-g.questionStream
+		question := <-g.questionStream
 
-		g.internalStream <- &GameState{
-			State:   SetQuestion,
-			Payload: *v,
-		}
+		g.setAction(setQuestion, *question)
 
 		time.Sleep(g.timePerRound)
 	}
 
-	g.internalStream <- &GameState{
-		State: Finish,
-	}
+	g.setAction(finish, nil)
 }
 
 // SubmitAnswer ...
 func (g *GamePlay) SubmitAnswer(name string, answer bool) {
-	if g.state != Start {
+	if g.state != OnProgress {
 		return
 	}
 
@@ -139,13 +139,7 @@ func (g *GamePlay) SubmitAnswer(name string, answer bool) {
 		return
 	}
 
-	g.internalStream <- &GameState{
-		State: AnswerQuestion,
-		Payload: SubmitAnswerPayload{
-			name:   name,
-			answer: answer,
-		},
-	}
+	g.setAction(answerQuestion, SubmitAnswerPayload{name, answer})
 }
 
 // AddPlayer ...
