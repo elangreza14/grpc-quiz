@@ -91,7 +91,6 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				r.Game.AddPlayer(player)
 				fmt.Printf("player %s joined. total %d players \n", player, r.TotalPlayer())
 			case StartGame:
-				// r.State = Started
 				r.BroadcastToAllPlayer("game started")
 				r.Game.Start()
 				r.Started = true

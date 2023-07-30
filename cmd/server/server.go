@@ -179,7 +179,7 @@ func (s *Server) streamReceive(name string, stream quiz.Quiz_StreamServer) error
 }
 
 func (s *Server) listenTerminal(ctx context.Context) {
-	fmt.Println("Waiting players to join. minimum is 2 players to start")
+	fmt.Println("Waiting players to join. minimum is 1 player to start")
 	for {
 		select {
 		case <-ctx.Done():

@@ -31,9 +31,11 @@ type (
 		internalStream chan *internalAction
 		externalStream chan *GameState
 		questionStream chan *QuestionPayload
-		questions      map[string]bool
+		stopStream     chan bool
+		questions      []QuestionPayload
 		timePerRound   time.Duration
 		expected       QuestionPayload
+		round          int
 	}
 
 	// SubmitAnswerPayload ...
@@ -44,8 +46,10 @@ type (
 
 	// QuestionPayload ...
 	QuestionPayload struct {
-		question string
-		answer   bool
+		question      string
+		answer        bool
+		block         chan bool
+		playerRetries map[string]int
 	}
 )
 
@@ -65,10 +69,25 @@ const (
 
 // NewGamePlay is ...
 func NewGamePlay() *GamePlay {
-	Questions := map[string]bool{
-		"1 + 1 = 2":  true,
-		"1 - 1 = -1": false,
-		"1 * 0 = 0":  true,
+	Questions := []QuestionPayload{
+		{
+			question:      "1 + 1 = 2",
+			answer:        true,
+			block:         make(chan bool),
+			playerRetries: map[string]int{},
+		},
+		{
+			question:      "1 - 1 = -1",
+			answer:        false,
+			block:         make(chan bool),
+			playerRetries: map[string]int{},
+		},
+		{
+			question:      "1 * 0 = 0",
+			answer:        true,
+			block:         make(chan bool),
+			playerRetries: map[string]int{},
+		},
 	}
 
 	g := &GamePlay{
@@ -77,8 +96,9 @@ func NewGamePlay() *GamePlay {
 		internalStream: make(chan *internalAction),
 		externalStream: make(chan *GameState),
 		questionStream: make(chan *QuestionPayload, len(Questions)),
+		stopStream:     make(chan bool),
 		questions:      Questions,
-		timePerRound:   3 * time.Second,
+		timePerRound:   10 * time.Second,
 	}
 
 	go g.listenInternalStream()
@@ -102,20 +122,34 @@ func (g *GamePlay) listenInternalStream() {
 				State: OnProgress,
 			}
 			g.state = OnProgress
-			for question, answer := range g.questions {
-				g.questionStream <- &QuestionPayload{question, answer}
+			for i := 0; i < len(g.questions); i++ {
+				q := g.questions[i]
+				g.questionStream <- &q
+
 			}
 		case setQuestion:
 			g.expected = res.payload.(QuestionPayload)
 			g.externalStream <- &GameState{
 				State:   OnProgress,
-				payload: g.expected.question,
+				payload: fmt.Sprintf("round %d: %s", g.round+1, g.expected.question),
 			}
 		case answerQuestion:
 			payload := res.payload.(SubmitAnswerPayload)
 			if payload.Answer == g.expected.answer {
 				g.players[payload.Name]++
 			}
+
+			// calculate the retry
+			if _, ok := g.questions[g.round].playerRetries[payload.Name]; ok {
+				g.questions[g.round].playerRetries[payload.Name]++
+			} else {
+				g.questions[g.round].playerRetries[payload.Name] = 0
+			}
+
+			if len(g.questions[g.round].playerRetries) == len(g.players) {
+				g.expected.block <- true
+			}
+
 		case finish:
 			g.externalStream <- &GameState{
 				State: Done,
@@ -132,15 +166,22 @@ func (g *GamePlay) Start() {
 
 func (g *GamePlay) listenQuestion() {
 	for i := 0; i < len(g.questions); i++ {
+		g.round = i
 		question := <-g.questionStream
 
 		g.setAction(setQuestion, *question)
 
-		time.Sleep(g.timePerRound)
+		select {
+		case <-question.block:
+			fmt.Println("already full")
+		case <-time.After(g.timePerRound):
+			fmt.Println("timeout", g.timePerRound)
+		}
 
 		for j, val := range g.players {
 			fmt.Printf("result %v: %v\n", j, val)
 		}
+		fmt.Printf("total answer %v\n", len(g.questions[i].playerRetries))
 	}
 
 	g.setAction(finish, nil)
