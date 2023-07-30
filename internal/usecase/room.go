@@ -99,6 +99,8 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				r.BroadcastToAllPlayer(evt.Payload.(string))
 			case BroadcastPersonal:
 				r.BroadcastToSpecificPlayer(evt.Payload.(BroadcastPersonalPayload))
+			case SubmitAnswer:
+				r.Game.SubmitAnswer(evt.Payload.(SubmitAnswerPayload))
 			default:
 				// no operation
 			}

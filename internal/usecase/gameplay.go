@@ -2,6 +2,7 @@
 package usecase
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -136,23 +137,27 @@ func (g *GamePlay) listenQuestion() {
 		g.setAction(setQuestion, *question)
 
 		time.Sleep(g.timePerRound)
+
+		for j, val := range g.players {
+			fmt.Printf("result %v: %v\n", j, val)
+		}
 	}
 
 	g.setAction(finish, nil)
 }
 
 // SubmitAnswer ...
-func (g *GamePlay) SubmitAnswer(name string, answer bool) {
+func (g *GamePlay) SubmitAnswer(answer SubmitAnswerPayload) {
 	if g.state != OnProgress {
 		return
 	}
 
-	_, ok := g.players[name]
+	_, ok := g.players[answer.Name]
 	if !ok {
 		return
 	}
 
-	g.setAction(answerQuestion, SubmitAnswerPayload{name, answer})
+	g.setAction(answerQuestion, answer)
 }
 
 // AddPlayer ...
