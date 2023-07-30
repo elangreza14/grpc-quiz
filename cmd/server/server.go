@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/elangreza14/grpc-quiz/internal/usecase"
 	quiz "github.com/elangreza14/grpc-quiz/proto"
@@ -65,6 +66,8 @@ func (s *Server) Start(ctx context.Context) error {
 		break
 	}
 
+	fmt.Println("shutting down the server")
+
 	s.Room.ShutdownClient()
 
 	srv.GracefulStop()
@@ -116,7 +119,7 @@ func (s *Server) Stream(stream quiz.Quiz_StreamServer) error {
 	go s.streamSend(stream, streamPlayer)
 
 	// receive stream from client
-	return s.streamReceive(stream)
+	return s.streamReceive(player[0], stream)
 }
 
 func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *quiz.StreamResponse) {
@@ -135,7 +138,7 @@ func (s *Server) streamSend(stream quiz.Quiz_StreamServer, streamPlayer <-chan *
 	}
 }
 
-func (s *Server) streamReceive(stream quiz.Quiz_StreamServer) error {
+func (s *Server) streamReceive(name string, stream quiz.Quiz_StreamServer) error {
 	for {
 		req, err := stream.Recv()
 		if err != nil {
@@ -145,10 +148,33 @@ func (s *Server) streamReceive(stream quiz.Quiz_StreamServer) error {
 			return err
 		}
 
-		s.Room.PublishQueue(&usecase.Event{
-			EventType: usecase.Broadcast,
-			Payload:   req.Message,
-		})
+		// if game not yet started
+		if !s.Room.Started {
+			s.Room.PublishQueue(&usecase.Event{
+				EventType: usecase.Broadcast,
+				Payload:   req.Message,
+			})
+			continue
+		}
+
+		msg := strings.ToLower(req.Message)
+		if msg == "y" || msg == "n" {
+			s.Room.PublishQueue(&usecase.Event{
+				EventType: usecase.SubmitAnswer,
+				Payload: usecase.SubmitAnswerPayload{
+					Name:   name,
+					Answer: msg == "y",
+				},
+			})
+		} else {
+			s.Room.PublishQueue(&usecase.Event{
+				EventType: usecase.BroadcastPersonal,
+				Payload: usecase.BroadcastPersonalPayload{
+					Name:    name,
+					Message: "only accept (Y/N) when game is started",
+				},
+			})
+		}
 	}
 }
 

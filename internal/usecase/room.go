@@ -21,11 +21,16 @@ type (
 	// Room is default structure for creating communication
 	Room struct {
 		// players  map[string]chan *quiz.StreamResponse
-		players sync.Map
-		queue   chan *Event
-		// State   State
+		players  sync.Map
+		queue    chan *Event
+		Started  bool
 		Game     *GamePlay
 		PowerOff chan bool
+	}
+
+	// BroadcastPersonalPayload is ...
+	BroadcastPersonalPayload struct {
+		Name, Message string
 	}
 )
 
@@ -34,8 +39,12 @@ const (
 	InsertPlayer eventType = iota
 	//  Broadcast is event for broadcast all the player
 	Broadcast
+	//  BroadcastPersonal is event for broadcast for specific the player
+	BroadcastPersonal
 	//  StartGame is event for start the game
 	StartGame
+	//  SubmitAnswer is event for submit the answer
+	SubmitAnswer
 )
 
 // NewRoom is
@@ -66,10 +75,10 @@ func (r *Room) ListenQueue(ctx context.Context) {
 			switch gameRes.State {
 			case OnProgress:
 				if gameRes.payload != nil {
-					fmt.Println(gameRes.payload)
+					r.BroadcastToAllPlayer(gameRes.payload.(string))
 				}
 			case Done:
-				fmt.Println("game finished")
+				r.BroadcastToAllPlayer("game finished")
 				r.PowerOff <- true
 			default:
 			}
@@ -83,10 +92,13 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				fmt.Printf("player %s joined. total %d players \n", player, r.TotalPlayer())
 			case StartGame:
 				// r.State = Started
-				r.BroadcastToPlayer("game started")
+				r.BroadcastToAllPlayer("game started")
 				r.Game.Start()
+				r.Started = true
 			case Broadcast:
-				r.BroadcastToPlayer(evt.Payload.(string))
+				r.BroadcastToAllPlayer(evt.Payload.(string))
+			case BroadcastPersonal:
+				r.BroadcastToSpecificPlayer(evt.Payload.(BroadcastPersonalPayload))
 			default:
 				// no operation
 			}
@@ -94,9 +106,15 @@ func (r *Room) ListenQueue(ctx context.Context) {
 	}
 }
 
-// BroadcastToPlayer is ...
-func (r *Room) BroadcastToPlayer(msg string) {
+// BroadcastToAllPlayer is ...
+func (r *Room) BroadcastToAllPlayer(msg string, playerException ...string) {
 	r.players.Range(func(key, value any) bool {
+		for i := 0; i < len(playerException); i++ {
+			if playerException[i] == key.(string) {
+				return true
+			}
+		}
+
 		ch, okChan := value.(chan *quiz.StreamResponse)
 		if okChan {
 			ch <- &quiz.StreamResponse{
@@ -111,6 +129,24 @@ func (r *Room) BroadcastToPlayer(msg string) {
 
 		return true
 	})
+}
+
+// BroadcastToSpecificPlayer is ...
+func (r *Room) BroadcastToSpecificPlayer(req BroadcastPersonalPayload) {
+	msgPlayer, ok := r.players.Load(req.Name)
+	if ok {
+		ch, okChan := msgPlayer.(chan *quiz.StreamResponse)
+		if okChan {
+			ch <- &quiz.StreamResponse{
+				Timestamp: timestamppb.Now(),
+				Event: &quiz.StreamResponse_ServerAnnouncement{
+					ServerAnnouncement: &quiz.Message{
+						Message: req.Message,
+					},
+				},
+			}
+		}
+	}
 }
 
 // ShutdownClient is ...
@@ -159,7 +195,7 @@ func (r *Room) TotalPlayer() int {
 	return total
 }
 
-// GetState is ...
-func (r *Room) GetState() <-chan bool {
+// Done is ...
+func (r *Room) Done() <-chan bool {
 	return r.PowerOff
 }

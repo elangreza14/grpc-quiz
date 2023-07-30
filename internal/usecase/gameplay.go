@@ -17,6 +17,7 @@ type (
 		payload any
 	}
 
+	// GameState is ...
 	GameState struct {
 		State
 		payload any
@@ -36,8 +37,8 @@ type (
 
 	// SubmitAnswerPayload ...
 	SubmitAnswerPayload struct {
-		name   string
-		answer bool
+		Name   string
+		Answer bool
 	}
 
 	// QuestionPayload ...
@@ -111,8 +112,8 @@ func (g *GamePlay) listenInternalStream() {
 			}
 		case answerQuestion:
 			payload := res.payload.(SubmitAnswerPayload)
-			if payload.answer == g.expected.answer {
-				g.players[payload.name]++
+			if payload.Answer == g.expected.answer {
+				g.players[payload.Name]++
 			}
 		case finish:
 			g.externalStream <- &GameState{
@@ -159,8 +160,3 @@ func (g *GamePlay) AddPlayer(name string) { g.players[name] = 0 }
 
 // ListenStream ...
 func (g *GamePlay) ListenStream() <-chan *GameState { return g.externalStream }
-
-// GetStats ...
-func (g *GamePlay) GetStats() string {
-	return "g.externalStream"
-}
