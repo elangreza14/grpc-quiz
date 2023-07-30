@@ -20,6 +20,7 @@ type (
 	Server struct {
 		Room     *usecase.Room
 		Terminal *usecase.Terminal
+		PowerOff chan bool
 
 		quiz.UnimplementedQuizServer
 	}
@@ -28,13 +29,18 @@ type (
 // NewServer define a grpc server
 func NewServer() *Server {
 	return &Server{
-		Room:     usecase.NewRoom(),
-		Terminal: usecase.NewTerminal(),
+		Room:                    usecase.NewRoom(),
+		Terminal:                usecase.NewTerminal(),
+		PowerOff:                make(chan bool),
+		UnimplementedQuizServer: quiz.UnimplementedQuizServer{},
 	}
 }
 
 // Start is gateway to grpc server
 func (s *Server) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	srv := grpc.NewServer()
 	quiz.RegisterQuizServer(srv, s)
 
@@ -52,7 +58,12 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	// wait until ctx is done
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		break
+	case <-s.Room.PowerOff:
+		break
+	}
 
 	s.Room.ShutdownClient()
 

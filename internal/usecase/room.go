@@ -24,7 +24,8 @@ type (
 		players sync.Map
 		queue   chan *Event
 		// State   State
-		Game *GamePlay
+		Game     *GamePlay
+		PowerOff chan bool
 	}
 )
 
@@ -40,9 +41,10 @@ const (
 // NewRoom is
 func NewRoom() *Room {
 	return &Room{
-		players: sync.Map{},
-		queue:   make(chan *Event, 100),
-		Game:    NewGamePlay(),
+		players:  sync.Map{},
+		queue:    make(chan *Event, 100),
+		Game:     NewGamePlay(),
+		PowerOff: make(chan bool),
 	}
 }
 
@@ -68,7 +70,7 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				}
 			case Done:
 				fmt.Println("game finished")
-				r.ShutdownClient()
+				r.PowerOff <- true
 			default:
 			}
 		case evt := <-r.queue:
@@ -158,6 +160,6 @@ func (r *Room) TotalPlayer() int {
 }
 
 // GetState is ...
-// func (r *Room) GetState() State {
-// 	return r.State
-// }
+func (r *Room) GetState() <-chan bool {
+	return r.PowerOff
+}
