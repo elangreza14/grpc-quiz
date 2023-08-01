@@ -227,7 +227,12 @@ func (g GamePlay) GetState() {
 		return players[i].point > players[j].point
 	})
 
-	fmt.Println("=== final point ===")
+	stateGame := "current"
+	if g.state == Done {
+		stateGame = "final"
+	}
+
+	fmt.Printf("=== %v point ===\n", stateGame)
 
 	for i := 0; i < len(players); i++ {
 		fmt.Printf("player: %v point %v\n", players[i].name, players[i].point)

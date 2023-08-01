@@ -75,7 +75,9 @@ func (r *Room) ListenQueue(ctx context.Context) {
 			switch gameRes.State {
 			case OnProgress:
 				if gameRes.payload != nil {
+					fmt.Println(gameRes.payload.(string))
 					r.BroadcastToAllPlayer(gameRes.payload.(string))
+					r.Game.GetState()
 				}
 			case Done:
 				r.BroadcastToAllPlayer("game finished")
