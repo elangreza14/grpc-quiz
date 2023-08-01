@@ -3,6 +3,7 @@ package usecase
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -173,15 +174,10 @@ func (g *GamePlay) listenQuestion() {
 
 		select {
 		case <-question.block:
-			fmt.Println("already full")
 		case <-time.After(g.timePerRound):
-			fmt.Println("timeout", g.timePerRound)
 		}
 
-		for j, val := range g.players {
-			fmt.Printf("result %v: %v\n", j, val)
-		}
-		fmt.Printf("total answer %v\n", len(g.questions[i].playerRetries))
+		// fmt.Printf("total answer %v\n", len(g.questions[i].playerRetries))
 	}
 
 	g.setAction(finish, nil)
@@ -209,3 +205,31 @@ func (g *GamePlay) RemovePlayer(name string) { delete(g.players, name) }
 
 // ListenStream ...
 func (g *GamePlay) ListenStream() <-chan *GameState { return g.externalStream }
+
+// GetState ...
+func (g GamePlay) GetState() {
+	players := []struct {
+		name  string
+		point int
+	}{}
+
+	for j, val := range g.players {
+		players = append(players, struct {
+			name  string
+			point int
+		}{
+			name:  j,
+			point: val,
+		})
+	}
+
+	sort.Slice(players, func(i, j int) bool {
+		return players[i].point > players[j].point
+	})
+
+	fmt.Println("=== final point ===")
+
+	for i := 0; i < len(players); i++ {
+		fmt.Printf("player: %v point %v\n", players[i].name, players[i].point)
+	}
+}

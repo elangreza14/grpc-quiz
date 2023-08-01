@@ -79,6 +79,7 @@ func (r *Room) ListenQueue(ctx context.Context) {
 				}
 			case Done:
 				r.BroadcastToAllPlayer("game finished")
+				r.Game.GetState()
 				r.PowerOff <- true
 			default:
 			}
