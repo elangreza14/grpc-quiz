@@ -183,6 +183,7 @@ func (r *Room) GetPlayerDetail(player string) (chan *quiz.StreamResponse, bool) 
 // RemovePlayer is ...
 func (r *Room) RemovePlayer(player string) {
 	r.players.Delete(player)
+	r.Game.RemovePlayer(player)
 }
 
 // TotalPlayer is ...
