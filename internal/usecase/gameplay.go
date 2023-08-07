@@ -172,9 +172,11 @@ func (g *GamePlay) listenQuestion() {
 
 		g.setAction(setQuestion, *question)
 
+		timeout := time.After(g.timePerRound)
+
 		select {
 		case <-question.block:
-		case <-time.After(g.timePerRound):
+		case <-timeout:
 		}
 
 		// fmt.Printf("total answer %v\n", len(g.questions[i].playerRetries))
